@@ -204,51 +204,40 @@ def main(page: ft.Page):
                         ft.Container(
                             expand=True,
                             padding=20,
-                            content=ft.Text(
-                                "⚠️ Nenhum dado encontrado para 2025",
-                                size=18,
-                                color=ft.Colors.ORANGE,
-                            ),
+                            content=ft.Text("⚠️ Nenhum dado encontrado para 2025",
+                                            size=18, color=ft.Colors.ORANGE),
                         ),
                         ft.ElevatedButton("↩️ Voltar", on_click=lambda _: page.go("/menu")),
                     ],
                 )
 
-            # === Helpers ===
+            # Helpers
             def is_mobile() -> bool:
                 return page.width < 640
 
-            def hscroll(control, min_width=900):
-                # força scroll horizontal envolvendo o conteúdo num Row rolável
-                return ft.Row(
-                    [ft.Container(content=control, width=min_width)],
-                    scroll=ft.ScrollMode.ALWAYS,
-                )
+            def hscroll(control, min_width=1100):
+                return ft.Row([ft.Container(content=control, width=min_width)],
+                            scroll=ft.ScrollMode.ALWAYS)
 
             meses_abrev = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
             def nome_mes(m: int) -> str:
                 return meses_abrev[m-1] if 1 <= m <= 12 else "Inválido"
 
             def format_real(v: float) -> str:
-                return (
-                    f"R$ {v:,.2f}"
-                    .replace(",", "X")
-                    .replace(".", ",")
-                    .replace("X", ".")
-                )
+                return f"R$ {(v or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-            def pct_txt(a: float, b: float) -> ft.Text:
+            def pct(a: float, b: float) -> ft.Text:
                 try:
-                    p = (a - b) / b * 100 if b else 0
+                    p = (a - (b or 0)) / (b or 1) * 100 if b else 0
                     color = ft.Colors.GREEN if p >= 0 else ft.Colors.RED
                     return ft.Text(f"{p:+.2f}%", color=color)
                 except:
                     return ft.Text("0.00%", color=ft.Colors.GREY)
 
             # Totais gerais
-            total_real     = sum(r[6] or 0 for r in rows)
-            total_anterior = sum(r[7] or 0 for r in rows)
-            total_meta     = sum(r[5] or 0 for r in rows)
+            total_real     = sum((r[6] or 0) for r in rows)
+            total_anterior = sum((r[7] or 0) for r in rows)
+            total_meta     = sum((r[5] or 0) for r in rows)
 
             # Último mês
             ultimo         = rows[-1]
@@ -259,132 +248,81 @@ def main(page: ft.Page):
 
             # Gráfico
             chart_data = [
-                ft.LineChartDataPoint(
-                    x=i+1,
-                    y=float(r[6] or 0),
-                    tooltip=format_real(float(r[6] or 0))
-                )
+                ft.LineChartDataPoint(x=i+1, y=float(r[6] or 0), tooltip=format_real(r[6] or 0))
                 for i, r in enumerate(rows)
             ]
-            max_y = max((p.y for p in chart_data), default=0) * 1.2 or 10
+            max_y = (max((p.y for p in chart_data), default=0) * 1.2) or 10
 
-            # Cards (ajuste de largura/altura no mobile)
-            card_w = None if is_mobile() else 400
-            card_h = 220 if is_mobile() else 300
-            card_style = dict(
-                bgcolor="#1f1f1f",
-                border_radius=10,
-                padding=15,
-                width=card_w,
-                height=card_h,
-            )
+            # Cards responsivos
+            mobile = is_mobile()
+            card_w = None if mobile else 400
+            card_h = 220 if mobile else 300
+            card_style = dict(bgcolor="#1f1f1f", border_radius=10, padding=15, width=card_w, height=card_h)
 
             card_acum = ft.Container(
                 **card_style,
                 content=ft.Column([
-                    ft.Text("📅 Acumulado do Ano", size=18 if is_mobile() else 20, weight="bold"),
+                    ft.Text("📅 Acumulado do Ano", size=18 if mobile else 20, weight="bold"),
                     ft.Text(f"Realizado: {format_real(total_real)}"),
                     ft.Text(f"Ano Anterior: {format_real(total_anterior)}", color=ft.Colors.GREY),
                     ft.Text(f"Meta: {format_real(total_meta)}", color=ft.Colors.BLUE_300),
-                    ft.Row([ft.Text("Vs. Ano Ant.: "), pct_txt(total_real, total_anterior)]),
-                    ft.Row([ft.Text("Vs. Meta:     "), pct_txt(total_real, total_meta)]),
+                    ft.Row([ft.Text("Vs. Ano Ant.:"), pct(total_real, total_anterior)]),
+                    ft.Row([ft.Text("Vs. Meta:"),     pct(total_real, total_meta)]),
                 ], spacing=6)
             )
 
             card_mes = ft.Container(
                 **card_style,
                 content=ft.Column([
-                    ft.Text("📆 Mês Atual", size=18 if is_mobile() else 20, weight="bold"),
+                    ft.Text("📆 Mês Atual", size=18 if mobile else 20, weight="bold"),
                     ft.Text(f"{nome_mes(mes_atual)}/2025"),
                     ft.Text(f"Realizado: {format_real(realizado_mes)}"),
                     ft.Text(f"Ano Anterior: {format_real(anterior_mes)}", color=ft.Colors.GREY),
                     ft.Text(f"Meta: {format_real(meta_mes)}", color=ft.Colors.BLUE_300),
-                    ft.Row([ft.Text("Vs. Mês Ant.: "), pct_txt(realizado_mes, anterior_mes)]),
-                    ft.Row([ft.Text("Vs. Meta:     "), pct_txt(realizado_mes, meta_mes)]),
+                    ft.Row([ft.Text("Vs. Mês Ant.:"), pct(realizado_mes, anterior_mes)]),
+                    ft.Row([ft.Text("Vs. Meta:"),     pct(realizado_mes, meta_mes)]),
                 ], spacing=6)
             )
 
-            # === Tabela responsiva ===
-            mobile = is_mobile()
-            if mobile:
-                # menos colunas no celular
-                table_columns = [
-                    ft.DataColumn(ft.Text("Mês")),
-                    ft.DataColumn(ft.Text("Realizado")),
-                    ft.DataColumn(ft.Text("Var. (%)")),   # vs Ano Ant.
-                ]
-            else:
-                table_columns = [
-                    ft.DataColumn(ft.Text("Mês")),
-                    ft.DataColumn(ft.Text("Realizado")),
-                    ft.DataColumn(ft.Text("Ano Anterior")),
-                    ft.DataColumn(ft.Text("Var. (%)")),
-                    ft.DataColumn(ft.Text("Meta")),
-                    ft.DataColumn(ft.Text("Var. (%)")),
-                ]
-
+            # Tabela completa (sempre todas colunas)
+            table_columns = [
+                ft.DataColumn(ft.Text("Mês")),
+                ft.DataColumn(ft.Text("Realizado")),
+                ft.DataColumn(ft.Text("Ano Anterior")),
+                ft.DataColumn(ft.Text("Var. (%)")),   # vs Ano Ant.
+                ft.DataColumn(ft.Text("Meta")),
+                ft.DataColumn(ft.Text("Var. (%)")),   # vs Meta
+            ]
             tabela_rows = []
             for r in rows:
                 mm = int(r[3]); real = r[6] or 0; ant = r[7] or 0; met = r[5] or 0
-                if mobile:
-                    tabela_rows.append(
-                        ft.DataRow(cells=[
-                            ft.DataCell(ft.Text(nome_mes(mm))),
-                            ft.DataCell(ft.Text(format_real(real))),
-                            ft.DataCell(pct_txt(real, ant)),
-                        ])
-                    )
-                else:
-                    tabela_rows.append(
-                        ft.DataRow(cells=[
-                            ft.DataCell(ft.Text(nome_mes(mm))),
-                            ft.DataCell(ft.Text(format_real(real))),
-                            ft.DataCell(ft.Text(format_real(ant))),
-                            ft.DataCell(pct_txt(real, ant)),
-                            ft.DataCell(ft.Text(format_real(met))),
-                            ft.DataCell(pct_txt(real, met)),
-                        ])
-                    )
-
-            # Linha Total
-            if mobile:
-                tabela_rows.append(
-                    ft.DataRow(
-                        cells=[
-                            ft.DataCell(ft.Text("Total", weight="bold")),
-                            ft.DataCell(ft.Text(format_real(total_real), weight="bold")),
-                            ft.DataCell(pct_txt(total_real, total_anterior)),
-                        ],
-                        selected=True,
-                    )
-                )
-            else:
-                tabela_rows.append(
-                    ft.DataRow(
-                        cells=[
-                            ft.DataCell(ft.Text("Total", weight="bold")),
-                            ft.DataCell(ft.Text(format_real(total_real), weight="bold")),
-                            ft.DataCell(ft.Text(format_real(total_anterior), weight="bold")),
-                            ft.DataCell(pct_txt(total_real, total_anterior)),
-                            ft.DataCell(ft.Text(format_real(total_meta), weight="bold")),
-                            ft.DataCell(pct_txt(total_real, total_meta)),
-                        ],
-                        selected=True,
-                    )
-                )
+                tabela_rows.append(ft.DataRow(cells=[
+                    ft.DataCell(ft.Text(nome_mes(mm))),
+                    ft.DataCell(ft.Text(format_real(real))),
+                    ft.DataCell(ft.Text(format_real(ant))),
+                    ft.DataCell(pct(real, ant)),
+                    ft.DataCell(ft.Text(format_real(met))),
+                    ft.DataCell(pct(real, met)),
+                ]))
+            tabela_rows.append(ft.DataRow(cells=[
+                ft.DataCell(ft.Text("Total", weight="bold")),
+                ft.DataCell(ft.Text(format_real(total_real), weight="bold")),
+                ft.DataCell(ft.Text(format_real(total_anterior), weight="bold")),
+                ft.DataCell(pct(total_real, total_anterior)),
+                ft.DataCell(ft.Text(format_real(total_meta), weight="bold")),
+                ft.DataCell(pct(total_real, total_meta)),
+            ], selected=True))
 
             data_table = ft.DataTable(
                 columns=table_columns,
                 rows=tabela_rows,
-                column_spacing=12 if mobile else 18,
-                heading_row_height=40 if mobile else 48,
-                data_row_min_height=40 if mobile else 46,
+                column_spacing=10 if mobile else 18,
+                heading_row_height=38 if mobile else 48,
+                data_row_min_height=36 if mobile else 46,
             )
+            table_min_w = 1100
 
-            # largura mínima da tabela (se precisar, habilita scroll horizontal)
-            table_min_w = 520 if mobile else 1000
-
-            # Monta a View completa
+            # View
             return ft.View(
                 "/vendas",
                 controls=[
@@ -399,40 +337,25 @@ def main(page: ft.Page):
                                 ft.Row([card_acum, card_mes], spacing=16 if mobile else 20, wrap=True),
                                 ft.Divider(),
                                 ft.Text("📈 Evolução Mensal", size=16, weight="bold"),
-
-                                # Gráfico com margens/altura responsivas
                                 ft.Container(
                                     margin=ft.margin.symmetric(horizontal=16 if mobile else 80),
-                                    padding=ft.padding.only(bottom=20 if mobile else 30),
+                                    padding=ft.padding.only(bottom=16 if mobile else 30),
                                     content=ft.Column([
                                         ft.LineChart(
-                                            data_series=[
-                                                ft.LineChartData(
-                                                    data_points=chart_data,
-                                                    curved=True,
-                                                    stroke_width=3,
-                                                    color=ft.Colors.BLUE,
-                                                )
-                                            ],
-                                            min_y=0,
-                                            max_y=max_y,
+                                            data_series=[ft.LineChartData(
+                                                data_points=chart_data, curved=True, stroke_width=3, color=ft.Colors.BLUE
+                                            )],
+                                            min_y=0, max_y=max_y,
                                             tooltip_bgcolor=ft.Colors.BLUE_800,
-                                            expand=True,
-                                            height=200 if mobile else 250,
+                                            expand=True, height=200 if mobile else 250,
                                         ),
-                                        ft.Row(
-                                            [ft.Text(nome_mes(int(r[3])), size=12) for r in rows],
-                                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                                        ),
+                                        ft.Row([ft.Text(nome_mes(int(r[3])), size=12) for r in rows],
+                                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                                     ])
                                 ),
-
                                 ft.Divider(),
                                 ft.Text("Detalhamento por Mês", size=16, weight="bold"),
-
-                                # ⬇️ TABELA COM SCROLL HORIZONTAL
                                 hscroll(data_table, min_width=table_min_w),
-
                                 ft.Divider(),
                                 ft.ElevatedButton(
                                     text="🔗 Ver Relatório Power BI",
@@ -440,7 +363,6 @@ def main(page: ft.Page):
                                     style=ft.ButtonStyle(bgcolor="#2563eb", color="white"),
                                     on_click=lambda _: page.launch_url("https://app.powerbi.com/view?r=eyJrIjoiYmVjMWY0YTctYjNhOC00ZGZlLTk2YzUtNGZkMjNjYWEzMWNmIiwidCI6IjYwNjY0ZmMwLWNiMGMtNGUyOS04MWRhLWNjMDlhYTExOTZhMCJ9"),
                                 ),
-
                                 ft.ElevatedButton(
                                     text="↩️ Voltar",
                                     on_click=lambda _: page.go("/menu"),
@@ -460,6 +382,7 @@ def main(page: ft.Page):
                     ft.Text(str(e), color=ft.Colors.RED_400),
                 ],
             )
+
 
         
     def fluxo_view():
@@ -484,135 +407,113 @@ def main(page: ft.Page):
                         ft.Container(
                             expand=True,
                             padding=20,
-                            content=ft.Text("⚠️ Nenhum dado encontrado para 2025", size=18, color=ft.Colors.ORANGE),
+                            content=ft.Text("⚠️ Nenhum dado encontrado para 2025",
+                                            size=18, color=ft.Colors.ORANGE)
                         ),
-                        ft.ElevatedButton("↩️ Voltar", on_click=lambda _: page.go("/menu")),
-                    ],
+                        ft.ElevatedButton("↩️ Voltar", on_click=lambda _: page.go("/menu"))
+                    ]
                 )
 
-            # === Helpers ===
+            # Helpers
             def is_mobile() -> bool:
                 return page.width < 640
 
-            def hscroll(control, min_width=900):
-                return ft.Row([ft.Container(content=control, width=min_width)], scroll=ft.ScrollMode.ALWAYS)
+            def hscroll(control, min_width=1100):
+                return ft.Row([ft.Container(content=control, width=min_width)],
+                            scroll=ft.ScrollMode.ALWAYS)
 
             def format_num(v: float) -> str:
-                return f"{v:,.0f}".replace(",", ".")
+                return f"{(v or 0):,.0f}".replace(",", ".")
 
-            def pct_txt(a: float, b: float) -> ft.Text:
-                p = (a - b) / b * 100 if b else 0
+            def pct(a: float, b: float) -> ft.Text:
+                p = (a - (b or 0)) / (b or 1) * 100 if b else 0
                 c = ft.Colors.GREEN if p >= 0 else ft.Colors.RED
                 return ft.Text(f"{p:+.2f}%", color=c)
 
-            # 3) Totais e mês atual
-            total_real      = sum(r[3] or 0 for r in rows)
-            total_meta      = sum(r[4] or 0 for r in rows if r[4] is not None)
-            total_anterior  = sum(r[5] or 0 for r in rows if r[5] is not None)
+            # Totais e mês atual
+            total_real      = sum((r[3] or 0) for r in rows)
+            total_meta      = sum((r[4] or 0) for r in rows if r[4] is not None)
+            total_anterior  = sum((r[5] or 0) for r in rows if r[5] is not None)
             ultimo          = rows[-1]
             mes_atual_nome  = ultimo[1]
             real_mes        = ultimo[3] or 0
             meta_mes        = ultimo[4] or 0
             ant_mes         = ultimo[5] or 0
 
-            # 4) Dados do gráfico
-            chart_data = [ft.LineChartDataPoint(x=i+1, y=float(r[3] or 0), tooltip=format_num(r[3] or 0))
-                        for i, r in enumerate(rows)]
+            # Gráfico
+            chart_data = [
+                ft.LineChartDataPoint(x=i+1, y=float(r[3] or 0), tooltip=format_num(r[3] or 0))
+                for i, r in enumerate(rows)
+            ]
             max_y = (max((p.y for p in chart_data), default=0) * 1.2) or 10
 
-            # 5) Cards responsivos
-            mobile  = is_mobile()
-            card_w  = None if mobile else 360
-            card_h  = 200 if mobile else 220
-            card_style = dict(bgcolor="#1f1f1f", border_radius=10, padding=15, width=card_w, height=card_h)
+            # Cards
+            mobile = is_mobile()
+            card_w = None if mobile else 360
+            card_h = 200 if mobile else 220
+            cs = dict(bgcolor="#1f1f1f", border_radius=10, padding=15, width=card_w, height=card_h)
 
             card_acum = ft.Container(
-                **card_style,
+                **cs,
                 content=ft.Column([
                     ft.Text("📊 Acumulado", size=18 if mobile else 20, weight="bold"),
                     ft.Text(f"Realizado: {format_num(total_real)}"),
                     ft.Text(f"Meta:       {format_num(total_meta)}", color=ft.Colors.BLUE_300),
                     ft.Text(f"Ano Ant.:   {format_num(total_anterior)}", color=ft.Colors.GREY),
-                    ft.Row([ft.Text("Vs. Meta:"), pct_txt(total_real, total_meta)]),
-                    ft.Row([ft.Text("Vs. Ano Ant.:"), pct_txt(total_real, total_anterior)]),
+                    ft.Row([ft.Text("Vs. Meta:"), pct(total_real, total_meta)]),
+                    ft.Row([ft.Text("Vs. Ano Ant.:"), pct(total_real, total_anterior)]),
                 ], spacing=4)
             )
-
             card_mes = ft.Container(
-                **card_style,
+                **cs,
                 content=ft.Column([
                     ft.Text(f"📆 Mês Atual: {mes_atual_nome}/2025", size=18 if mobile else 20, weight="bold"),
                     ft.Text(f"Realizado: {format_num(real_mes)}"),
                     ft.Text(f"Meta:       {format_num(meta_mes)}", color=ft.Colors.BLUE_300),
                     ft.Text(f"Ano Ant.:   {format_num(ant_mes)}", color=ft.Colors.GREY),
-                    ft.Row([ft.Text("Vs. Meta:"), pct_txt(real_mes, meta_mes)]),
-                    ft.Row([ft.Text("Vs. Ano Ant.:"), pct_txt(real_mes, ant_mes)]),
+                    ft.Row([ft.Text("Vs. Meta:"), pct(real_mes, meta_mes)]),
+                    ft.Row([ft.Text("Vs. Ano Ant.:"), pct(real_mes, ant_mes)]),
                 ], spacing=4)
             )
 
-            # 6) Tabela comparativa (responsiva)
-            if mobile:
-                table_columns = [
-                    ft.DataColumn(ft.Text("Mês")),
-                    ft.DataColumn(ft.Text("Realizado")),
-                    ft.DataColumn(ft.Text("Var. (%)")),   # vs Ano Ant.
-                ]
-            else:
-                table_columns = [
-                    ft.DataColumn(ft.Text("Mês")),
-                    ft.DataColumn(ft.Text("Realizado")),
-                    ft.DataColumn(ft.Text("Ano Ant.")),
-                    ft.DataColumn(ft.Text("Var. (%)")),
-                    ft.DataColumn(ft.Text("Meta")),
-                    ft.DataColumn(ft.Text("Var. (%)")),
-                ]
-
+            # Tabela completa
+            table_columns = [
+                ft.DataColumn(ft.Text("Mês")),
+                ft.DataColumn(ft.Text("Realizado")),
+                ft.DataColumn(ft.Text("Ano Ant.")),
+                ft.DataColumn(ft.Text("Var. (%)")),
+                ft.DataColumn(ft.Text("Meta")),
+                ft.DataColumn(ft.Text("Var. (%)")),
+            ]
             tabela_rows = []
             for r in rows:
-                mes_nome = r[1]; realizado = r[3] or 0; meta = r[4] or 0; anterior = r[5] or 0
-                if mobile:
-                    tabela_rows.append(ft.DataRow(cells=[
-                        ft.DataCell(ft.Text(mes_nome)),
-                        ft.DataCell(ft.Text(format_num(realizado))),
-                        ft.DataCell(pct_txt(realizado, anterior)),
-                    ]))
-                else:
-                    tabela_rows.append(ft.DataRow(cells=[
-                        ft.DataCell(ft.Text(mes_nome)),
-                        ft.DataCell(ft.Text(format_num(realizado))),
-                        ft.DataCell(ft.Text(format_num(anterior))),
-                        ft.DataCell(pct_txt(realizado, anterior)),
-                        ft.DataCell(ft.Text(format_num(meta))),
-                        ft.DataCell(pct_txt(realizado, meta)),
-                    ]))
-
-            # Total
-            if mobile:
                 tabela_rows.append(ft.DataRow(cells=[
-                    ft.DataCell(ft.Text("Total", weight="bold")),
-                    ft.DataCell(ft.Text(format_num(total_real), weight="bold")),
-                    ft.DataCell(pct_txt(total_real, total_anterior)),
-                ], selected=True))
-            else:
-                tabela_rows.append(ft.DataRow(cells=[
-                    ft.DataCell(ft.Text("Total", weight="bold")),
-                    ft.DataCell(ft.Text(format_num(total_real), weight="bold")),
-                    ft.DataCell(ft.Text(format_num(total_anterior), weight="bold")),
-                    ft.DataCell(pct_txt(total_real, total_anterior)),
-                    ft.DataCell(ft.Text(format_num(total_meta), weight="bold")),
-                    ft.DataCell(pct_txt(total_real, total_meta)),
-                ], selected=True))
+                    ft.DataCell(ft.Text(r[1])),                         # mes_nome
+                    ft.DataCell(ft.Text(format_num(r[3] or 0))),        # realizado
+                    ft.DataCell(ft.Text(format_num(r[5] or 0))),        # ano_anterior
+                    ft.DataCell(pct(r[3] or 0, r[5] or 0)),             # vs ant
+                    ft.DataCell(ft.Text(format_num(r[4] or 0))),        # meta
+                    ft.DataCell(pct(r[3] or 0, r[4] or 0)),             # vs meta
+                ]))
+            tabela_rows.append(ft.DataRow(cells=[
+                ft.DataCell(ft.Text("Total", weight="bold")),
+                ft.DataCell(ft.Text(format_num(total_real),     weight="bold")),
+                ft.DataCell(ft.Text(format_num(total_anterior), weight="bold")),
+                ft.DataCell(pct(total_real, total_anterior)),
+                ft.DataCell(ft.Text(format_num(total_meta),     weight="bold")),
+                ft.DataCell(pct(total_real, total_meta)),
+            ], selected=True))
 
             data_table = ft.DataTable(
                 columns=table_columns,
                 rows=tabela_rows,
-                column_spacing=12 if mobile else 18,
-                heading_row_height=40 if mobile else 48,
-                data_row_min_height=40 if mobile else 46,
+                column_spacing=10 if mobile else 18,
+                heading_row_height=38 if mobile else 48,
+                data_row_min_height=36 if mobile else 46,
             )
-            table_min_w = 520 if mobile else 1000
+            table_min_w = 1100
 
-            # 7) Monta a View
+            # View
             return ft.View(
                 "/veiculos",
                 controls=[
@@ -674,6 +575,7 @@ def main(page: ft.Page):
             )
 
 
+
     def estacionamento_view():
         try:
             # busca
@@ -693,8 +595,7 @@ def main(page: ft.Page):
                     "/estacionamento",
                     controls=[
                         ft.AppBar(title=ft.Text("💰 Receita de Estacionamento"), bgcolor="#1e1e1e"),
-                        ft.Container(
-                            expand=True, padding=20,
+                        ft.Container(expand=True, padding=20,
                             content=ft.Text("⚠️ Nenhum dado encontrado para 2025",
                                             size=18, color=ft.Colors.ORANGE)
                         ),
@@ -702,19 +603,20 @@ def main(page: ft.Page):
                     ]
                 )
 
-            # === Helpers ===
+            # helpers
             def is_mobile() -> bool:
                 return page.width < 640
 
-            def hscroll(control, min_width=900):
-                return ft.Row([ft.Container(content=control, width=min_width)], scroll=ft.ScrollMode.ALWAYS)
+            def hscroll(control, min_width=1100):
+                return ft.Row([ft.Container(content=control, width=min_width)],
+                            scroll=ft.ScrollMode.ALWAYS)
 
-            def fmt(v):
-                return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            def fmt(v): 
+                return f"{(v or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-            def pct_txt(a, b):
-                p = (a - b) / b * 100 if b else 0
-                c = ft.Colors.GREEN if p >= 0 else ft.Colors.RED
+            def pct(a,b):
+                p = (a - (b or 0)) / (b or 1) * 100 if b else 0
+                c = ft.Colors.GREEN if p>=0 else ft.Colors.RED
                 return ft.Text(f"{p:+.2f}%", color=c)
 
             # totais / atual
@@ -730,16 +632,15 @@ def main(page: ft.Page):
             # gráfico
             chart_data = [
                 ft.LineChartDataPoint(x=i+1, y=float(r[3] or 0), tooltip=f"R$ {fmt(r[3] or 0)}")
-                for i, r in enumerate(rows)
+                for i,r in enumerate(rows)
             ]
             max_y = (max((p.y for p in chart_data), default=0) * 1.2) or 10
 
-            # cards responsivos
+            # cards
             mobile = is_mobile()
             card_w = None if mobile else 360
             card_h = 200 if mobile else 220
             cs = dict(bgcolor="#1f1f1f", border_radius=10, padding=15, width=card_w, height=card_h)
-
             card_acum = ft.Container(
                 **cs,
                 content=ft.Column([
@@ -747,8 +648,8 @@ def main(page: ft.Page):
                     ft.Text(f"Realizado: R$ {fmt(total_real)}"),
                     ft.Text(f"Meta:       R$ {fmt(total_meta)}", color=ft.Colors.BLUE_300),
                     ft.Text(f"Ano Ant.:   R$ {fmt(total_anterior)}", color=ft.Colors.GREY),
-                    ft.Row([ft.Text("Vs. Meta:"), pct_txt(total_real, total_meta)]),
-                    ft.Row([ft.Text("Vs. Ano Ant.:"), pct_txt(total_real, total_anterior)]),
+                    ft.Row([ft.Text("Vs. Meta:"), pct(total_real, total_meta)]),
+                    ft.Row([ft.Text("Vs. Ano Ant.:"), pct(total_real, total_anterior)]),
                 ], spacing=4)
             )
             card_mes = ft.Container(
@@ -758,81 +659,55 @@ def main(page: ft.Page):
                     ft.Text(f"Realizado: R$ {fmt(real_mes)}"),
                     ft.Text(f"Meta:       R$ {fmt(meta_mes)}", color=ft.Colors.BLUE_300),
                     ft.Text(f"Ano Ant.:   R$ {fmt(ant_mes)}", color=ft.Colors.GREY),
-                    ft.Row([ft.Text("Vs. Meta:"), pct_txt(real_mes, meta_mes)]),
-                    ft.Row([ft.Text("Vs. Ano Ant.:"), pct_txt(real_mes, ant_mes)]),
+                    ft.Row([ft.Text("Vs. Meta:"), pct(real_mes, meta_mes)]),
+                    ft.Row([ft.Text("Vs. Ano Ant.:"), pct(real_mes, ant_mes)]),
                 ], spacing=4)
             )
 
-            # tabela comparativa (responsiva)
-            if mobile:
-                table_columns = [
-                    ft.DataColumn(ft.Text("Mês")),
-                    ft.DataColumn(ft.Text("Realizado")),
-                    ft.DataColumn(ft.Text("Var. (%)")),   # vs Ano Ant.
-                ]
-            else:
-                table_columns = [
-                    ft.DataColumn(ft.Text("Mês")),
-                    ft.DataColumn(ft.Text("Realizado")),
-                    ft.DataColumn(ft.Text("Ano Ant.")),
-                    ft.DataColumn(ft.Text("Var. (%)")),
-                    ft.DataColumn(ft.Text("Meta")),
-                    ft.DataColumn(ft.Text("Var. (%)")),
-                ]
-
+            # tabela completa
+            table_columns = [
+                ft.DataColumn(ft.Text("Mês")),
+                ft.DataColumn(ft.Text("Realizado")),
+                ft.DataColumn(ft.Text("Ano Ant.")),
+                ft.DataColumn(ft.Text("Var. (%)")),
+                ft.DataColumn(ft.Text("Meta")),
+                ft.DataColumn(ft.Text("Var. (%)")),
+            ]
             tabela = []
             for r in rows:
-                mes_nome = r[1]; realizado = r[3] or 0; anterior = r[5] or 0; meta = r[4] or 0
-                if mobile:
-                    tabela.append(ft.DataRow(cells=[
-                        ft.DataCell(ft.Text(mes_nome)),
-                        ft.DataCell(ft.Text(f"R$ {fmt(realizado)}")),
-                        ft.DataCell(pct_txt(realizado, anterior)),
-                    ]))
-                else:
-                    tabela.append(ft.DataRow(cells=[
-                        ft.DataCell(ft.Text(mes_nome)),
-                        ft.DataCell(ft.Text(f"R$ {fmt(realizado)}")),
-                        ft.DataCell(ft.Text(f"R$ {fmt(anterior)}")),
-                        ft.DataCell(pct_txt(realizado, anterior)),
-                        ft.DataCell(ft.Text(f"R$ {fmt(meta)}")),
-                        ft.DataCell(pct_txt(realizado, meta)),
-                    ]))
-
-            # total
-            if mobile:
                 tabela.append(ft.DataRow(cells=[
-                    ft.DataCell(ft.Text("Total", weight="bold")),
-                    ft.DataCell(ft.Text(f"R$ {fmt(total_real)}", weight="bold")),
-                    ft.DataCell(pct_txt(total_real, total_anterior)),
-                ], selected=True))
-            else:
-                tabela.append(ft.DataRow(cells=[
-                    ft.DataCell(ft.Text("Total", weight="bold")),
-                    ft.DataCell(ft.Text(f"R$ {fmt(total_real)}", weight="bold")),
-                    ft.DataCell(ft.Text(f"R$ {fmt(total_anterior)}", weight="bold")),
-                    ft.DataCell(pct_txt(total_real, total_anterior)),
-                    ft.DataCell(ft.Text(f"R$ {fmt(total_meta)}", weight="bold")),
-                    ft.DataCell(pct_txt(total_real, total_meta)),
-                ], selected=True))
+                    ft.DataCell(ft.Text(r[1])),
+                    ft.DataCell(ft.Text(f"R$ {fmt(r[3])}")),
+                    ft.DataCell(ft.Text(f"R$ {fmt(r[5])}")),
+                    ft.DataCell(pct(r[3] or 0, r[5] or 0)),
+                    ft.DataCell(ft.Text(f"R$ {fmt(r[4])}")),
+                    ft.DataCell(pct(r[3] or 0, r[4] or 0)),
+                ]))
+            tabela.append(ft.DataRow(cells=[
+                ft.DataCell(ft.Text("Total", weight="bold")),
+                ft.DataCell(ft.Text(f"R$ {fmt(total_real)}",     weight="bold")),
+                ft.DataCell(ft.Text(f"R$ {fmt(total_anterior)}", weight="bold")),
+                ft.DataCell(pct(total_real, total_anterior)),
+                ft.DataCell(ft.Text(f"R$ {fmt(total_meta)}",     weight="bold")),
+                ft.DataCell(pct(total_real, total_meta)),
+            ], selected=True))
 
             data_table = ft.DataTable(
                 columns=table_columns,
                 rows=tabela,
-                column_spacing=12 if mobile else 18,
-                heading_row_height=40 if mobile else 48,
-                data_row_min_height=40 if mobile else 46,
+                column_spacing=10 if mobile else 18,
+                heading_row_height=38 if mobile else 48,
+                data_row_min_height=36 if mobile else 46,
             )
-            table_min_w = 520 if mobile else 1000
+            table_min_w = 1100
 
-            # monta view
+            # view
             return ft.View(
                 "/estacionamento",
                 controls=[
                     ft.AppBar(title=ft.Text("💰 Receita de Estacionamento"), bgcolor="#1e1e1e"),
                     ft.Container(
-                        expand=True,
-                        padding=ft.padding.symmetric(horizontal=16 if mobile else 20, vertical=16),
+                        expand=True, padding=ft.padding.symmetric(horizontal=16 if mobile else 20, vertical=16),
                         content=ft.Column(
                             scroll="auto", spacing=20,
                             controls=[
@@ -849,10 +724,8 @@ def main(page: ft.Page):
                                             tooltip_bgcolor=ft.Colors.BLUE_800,
                                             expand=True, height=180 if mobile else 200
                                         ),
-                                        ft.Row(
-                                            [ft.Text(r[1], size=12) for r in rows],
-                                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-                                        )
+                                        ft.Row([ft.Text(r[1], size=12) for r in rows],
+                                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
                                     ])
                                 ),
                                 ft.Divider(),
@@ -916,7 +789,7 @@ def main(page: ft.Page):
             def is_mobile() -> bool:
                 return page.width < 640
 
-            def hscroll(control, min_width=900):
+            def hscroll(control, min_width=1100):
                 return ft.Row([ft.Container(content=control, width=min_width)], scroll=ft.ScrollMode.ALWAYS)
 
             def fmt(v):  # inteiros com ponto de milhar
@@ -973,59 +846,45 @@ def main(page: ft.Page):
                 ], spacing=4)
             )
 
-            # 6) tabela (responsiva)
-            if mobile:
-                table_columns = [
-                    ft.DataColumn(ft.Text("Mês")),
-                    ft.DataColumn(ft.Text("Realizado")),
-                    ft.DataColumn(ft.Text("Var. (%)")),   # vs Ano Ant.
-                ]
-            else:
-                table_columns = [
-                    ft.DataColumn(ft.Text("Mês")),
-                    ft.DataColumn(ft.Text("Realizado")),
-                    ft.DataColumn(ft.Text("Var. (%)")),
-                    ft.DataColumn(ft.Text("Ano Ant.")),
-                    ft.DataColumn(ft.Text("Var. (%)")),
-                    ft.DataColumn(ft.Text("Meta")),
-                ]
+            # 6) tabela SEM esconder colunas
+            table_columns = [
+                ft.DataColumn(ft.Text("Mês")),
+                ft.DataColumn(ft.Text("Realizado")),
+                ft.DataColumn(ft.Text("Ano Ant.")),
+                ft.DataColumn(ft.Text("Var. (%)")),   # vs Ano Ant.
+                ft.DataColumn(ft.Text("Meta")),
+                ft.DataColumn(ft.Text("Var. (%)")),   # vs Meta
+            ]
 
             tabela = []
             for r in rows:
                 mes_nome, realizado, meta, anterior = r[1], (r[3] or 0), (r[4] or 0), (r[5] or 0)
-                if mobile:
-                    tabela.append(ft.DataRow(cells=[
-                        ft.DataCell(ft.Text(mes_nome)),
-                        ft.DataCell(ft.Text(fmt(realizado))),
-                        ft.DataCell(pct_txt(realizado, anterior)),
-                    ]))
-                else:
-                    tabela.append(ft.DataRow(cells=[
-                        ft.DataCell(ft.Text(mes_nome)),
-                        ft.DataCell(ft.Text(fmt(realizado))),
-                        ft.DataCell(pct_txt(realizado, anterior)),
-                        ft.DataCell(ft.Text(fmt(anterior))),
-                        ft.DataCell(pct_txt(realizado, meta)),
-                        ft.DataCell(ft.Text(fmt(meta))),
-                    ]))
+                tabela.append(ft.DataRow(cells=[
+                    ft.DataCell(ft.Text(mes_nome)),
+                    ft.DataCell(ft.Text(fmt(realizado))),
+                    ft.DataCell(ft.Text(fmt(anterior))),
+                    ft.DataCell(pct_txt(realizado, anterior)),
+                    ft.DataCell(ft.Text(fmt(meta))),
+                    ft.DataCell(pct_txt(realizado, meta)),
+                ]))
 
             tabela.append(ft.DataRow(cells=[
                 ft.DataCell(ft.Text("Total", weight="bold")),
                 ft.DataCell(ft.Text(fmt(total_real), weight="bold")),
-                ft.DataCell(pct_txt(total_real, total_ant)) if mobile else ft.DataCell(pct_txt(total_real, total_ant)),
-                *( [ft.DataCell(ft.Text(fmt(total_ant),  weight="bold")),
-                    ft.DataCell(pct_txt(total_real, total_meta)),
-                    ft.DataCell(ft.Text(fmt(total_meta), weight="bold"))] if not mobile else [] )
+                ft.DataCell(ft.Text(fmt(total_ant),  weight="bold")),
+                ft.DataCell(pct_txt(total_real, total_ant)),
+                ft.DataCell(ft.Text(fmt(total_meta), weight="bold")),
+                ft.DataCell(pct_txt(total_real, total_meta)),
             ], selected=True))
 
             data_table = ft.DataTable(
                 columns=table_columns,
                 rows=tabela,
-                column_spacing=12 if mobile else 18,
-                heading_row_height=40 if mobile else 48,
-                data_row_min_height=40 if mobile else 46,
+                column_spacing=10 if mobile else 18,
+                heading_row_height=38 if mobile else 48,
+                data_row_min_height=36 if mobile else 46,
             )
-            table_min_w = 520 if mobile else 1000
+            table_min_w = 1100  # força scroll horizontal no mobile
 
             # 7) monta view
             return ft.View(
@@ -1051,10 +910,8 @@ def main(page: ft.Page):
                                             tooltip_bgcolor=ft.Colors.BLUE_800,
                                             expand=True, height=180 if mobile else 200
                                         ),
-                                        ft.Row(
-                                            [ft.Text(r[1], size=12) for r in rows],
-                                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-                                        )
+                                        ft.Row([ft.Text(r[1], size=12) for r in rows],
+                                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
                                     ])
                                 ),
                                 ft.Divider(),
@@ -1087,6 +944,7 @@ def main(page: ft.Page):
                 ]
             )
 
+
         
     def noi_view(page: ft.Page):
         try:
@@ -1114,47 +972,37 @@ def main(page: ft.Page):
 
             # === Helpers ===
             meses_abrev = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
-            def nome_mes(m: int) -> str:
-                return meses_abrev[m-1] if 1 <= m <= 12 else "Inválido"
-
-            def is_mobile() -> bool:
-                return page.width < 640
-
-            def hscroll(control, min_width=900):
+            def nome_mes(m: int) -> str: return meses_abrev[m-1] if 1 <= m <= 12 else "Inválido"
+            def is_mobile() -> bool: return page.width < 640
+            def hscroll(control, min_width=1100):
                 return ft.Row([ft.Container(content=control, width=min_width)], scroll=ft.ScrollMode.ALWAYS)
-
             def format_real(v: float) -> str:
                 return f"R$ {(v or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
             def pct_txt(a: float, b: float) -> ft.Text:
                 p = (a - (b or 0)) / (abs(b) or 1) * 100 if b else 0
                 color = ft.Colors.GREEN if p >= 0 else ft.Colors.RED
                 return ft.Text(f"{p:+.2f}%", color=color)
 
-            # — Totais gerais e mês atual —
+            # Totais e mês atual
             total_real     = sum((r[6] or 0) for r in rows)
             total_anterior = sum((r[7] or 0) for r in rows)
             total_meta     = sum((r[5] or 0) for r in rows)
-
             ultimo         = rows[-1]
             mes_atual      = int(ultimo[3])
             realizado_mes  = ultimo[6] or 0
             anterior_mes   = ultimo[7] or 0
             meta_mes       = ultimo[5] or 0
 
-            # — Gráfico —
+            # Gráfico
             chart_data = [
-                ft.LineChartDataPoint(
-                    x=i+1,
-                    y=float(r[6] or 0),
-                    tooltip=format_real(float(r[6] or 0))
-                ) for i, r in enumerate(rows)
+                ft.LineChartDataPoint(x=i+1, y=float(r[6] or 0), tooltip=format_real(float(r[6] or 0)))
+                for i, r in enumerate(rows)
             ]
             ys = [p.y for p in chart_data] or [0]
             min_y = min(ys) * 1.2
             max_y = (max(ys) * 1.2) or 10
 
-            # — Cards responsivos —
+            # Cards responsivos
             mobile = is_mobile()
             card_w = None if mobile else 400
             card_h = 220 if mobile else 300
@@ -1185,73 +1033,50 @@ def main(page: ft.Page):
                 ], spacing=6)
             )
 
-            # — Tabela responsiva —
-            if mobile:
-                table_columns = [
-                    ft.DataColumn(ft.Text("Mês")),
-                    ft.DataColumn(ft.Text("Realizado")),
-                    ft.DataColumn(ft.Text("Var. (%)")),   # vs Ano Ant.
-                ]
-            else:
-                table_columns = [
-                    ft.DataColumn(ft.Text("Mês")),
-                    ft.DataColumn(ft.Text("Realizado")),
-                    ft.DataColumn(ft.Text("Ano Anterior")),
-                    ft.DataColumn(ft.Text("Var. (%)")),
-                    ft.DataColumn(ft.Text("Meta")),
-                    ft.DataColumn(ft.Text("Var. (%)")),
-                ]
+            # Tabela SEM esconder colunas
+            table_columns = [
+                ft.DataColumn(ft.Text("Mês")),
+                ft.DataColumn(ft.Text("Realizado")),
+                ft.DataColumn(ft.Text("Ano Anterior")),
+                ft.DataColumn(ft.Text("Var. (%)")),   # vs Ano Ant.
+                ft.DataColumn(ft.Text("Meta")),
+                ft.DataColumn(ft.Text("Var. (%)")),   # vs Meta
+            ]
 
             tabela_rows = []
             for r in rows:
                 mm   = int(r[3]); real = r[6] or 0; ant = r[7] or 0; met = r[5] or 0
-                if mobile:
-                    tabela_rows.append(ft.DataRow(cells=[
-                        ft.DataCell(ft.Text(nome_mes(mm))),
-                        ft.DataCell(ft.Text(format_real(real))),
-                        ft.DataCell(pct_txt(real, ant)),
-                    ]))
-                else:
-                    tabela_rows.append(ft.DataRow(cells=[
-                        ft.DataCell(ft.Text(nome_mes(mm))),
-                        ft.DataCell(ft.Text(format_real(real))),
-                        ft.DataCell(ft.Text(format_real(ant))),
-                        ft.DataCell(pct_txt(real, ant)),
-                        ft.DataCell(ft.Text(format_real(met))),
-                        ft.DataCell(pct_txt(real, met)),
-                    ]))
+                tabela_rows.append(ft.DataRow(cells=[
+                    ft.DataCell(ft.Text(nome_mes(mm))),
+                    ft.DataCell(ft.Text(format_real(real))),
+                    ft.DataCell(ft.Text(format_real(ant))),
+                    ft.DataCell(pct_txt(real, ant)),
+                    ft.DataCell(ft.Text(format_real(met))),
+                    ft.DataCell(pct_txt(real, met)),
+                ]))
 
             # Linha Total
-            if mobile:
-                tabela_rows.append(
-                    ft.DataRow(cells=[
-                        ft.DataCell(ft.Text("Total", weight="bold")),
-                        ft.DataCell(ft.Text(format_real(total_real), weight="bold")),
-                        ft.DataCell(pct_txt(total_real, total_anterior)),
-                    ], selected=True)
-                )
-            else:
-                tabela_rows.append(
-                    ft.DataRow(cells=[
-                        ft.DataCell(ft.Text("Total", weight="bold")),
-                        ft.DataCell(ft.Text(format_real(total_real),     weight="bold")),
-                        ft.DataCell(ft.Text(format_real(total_anterior), weight="bold")),
-                        ft.DataCell(pct_txt(total_real, total_anterior)),
-                        ft.DataCell(ft.Text(format_real(total_meta),     weight="bold")),
-                        ft.DataCell(pct_txt(total_real, total_meta)),
-                    ], selected=True)
-                )
+            tabela_rows.append(
+                ft.DataRow(cells=[
+                    ft.DataCell(ft.Text("Total", weight="bold")),
+                    ft.DataCell(ft.Text(format_real(total_real),     weight="bold")),
+                    ft.DataCell(ft.Text(format_real(total_anterior), weight="bold")),
+                    ft.DataCell(pct_txt(total_real, total_anterior)),
+                    ft.DataCell(ft.Text(format_real(total_meta),     weight="bold")),
+                    ft.DataCell(pct_txt(total_real, total_meta)),
+                ], selected=True)
+            )
 
             data_table = ft.DataTable(
                 columns=table_columns,
                 rows=tabela_rows,
-                column_spacing=12 if mobile else 18,
-                heading_row_height=40 if mobile else 48,
-                data_row_min_height=40 if mobile else 46,
+                column_spacing=10 if mobile else 18,
+                heading_row_height=38 if mobile else 48,
+                data_row_min_height=36 if mobile else 46,
             )
-            table_min_w = 520 if mobile else 1000
+            table_min_w = 1100  # força scroll horizontal no mobile
 
-            # — View —
+            # View
             return ft.View(
                 "/noi",
                 controls=[
@@ -1321,6 +1146,7 @@ def main(page: ft.Page):
                     ft.ElevatedButton("↩️ Voltar", on_click=lambda _: page.go("/menu")),
                 ],
             )
+
 
         
     def admin_view(page: ft.Page):
