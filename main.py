@@ -11,6 +11,13 @@ def main(page: ft.Page):
     page.window_height = 700
     page.scroll = ft.ScrollMode.ALWAYS
 
+    # UI de teste
+    def ping(_):
+        page.snack_bar = ft.SnackBar(ft.Text("pong"))
+        page.snack_bar.open = True
+        page.update()
+
+    page.add(ft.Text("Render OK ✅"), ft.ElevatedButton("Ping", on_click=ping))
 
     def menu_button_style(bg="#00ffcc", fg="black"):
         return ft.ButtonStyle(
@@ -1382,4 +1389,5 @@ def main(page: ft.Page):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
+    print(f"🚀 Flet ouvindo em 0.0.0.0:{port}")
     ft.app(main, view=ft.AppView.WEB_BROWSER, host="0.0.0.0", port=port)
